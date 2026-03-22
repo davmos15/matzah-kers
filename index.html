@@ -654,7 +654,8 @@ body{background:#fff;font-family:'Nunito Sans',sans-serif;}
 <div class="sheet">
   <div class="section-label">Card Fronts (${active.length} cards)</div>
   ${frontPages}
-  <div class="page-break"></div>
+</div>
+<div class="sheet" style="page-break-before:always;break-before:page;">
   <div class="section-label">Card Backs (print on reverse side)</div>
   ${backPages}
 </div>
