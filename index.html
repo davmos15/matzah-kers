@@ -108,6 +108,45 @@ body.seder-mode .catalog-only{display:none!important;}
 .sync-online{background:rgba(39,174,96,0.2);color:#27ae60;}
 .sync-offline{background:rgba(192,57,43,0.2);color:#c0392b;}
 
+/* ═══ MOBILE ═══════════════════════════════════════════════ */
+@media(max-width:768px){
+  header{flex-direction:column;gap:10px;padding:10px 14px;align-items:stretch;}
+  header h1{font-size:1.1rem;text-align:center;}
+  .header-actions{justify-content:center;gap:6px;}
+  .btn-sm{padding:5px 8px;font-size:0.68rem;}
+  .share-bar{flex-direction:column;padding:8px 14px;gap:6px;text-align:center;}
+  .share-bar code{font-size:0.65rem;word-break:break-all;padding:4px 8px;}
+  .toolbar{padding:8px 14px;gap:6px;}
+  .filter-group{flex-wrap:wrap;}
+  .main{flex-direction:column;}
+  .card-grid-panel{padding:12px 10px;}
+  .card-grid{grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:10px;}
+  .card-back-preview img{width:90px;height:126px;}
+
+  /* Edit panel becomes bottom drawer */
+  .edit-panel{
+    width:100%;height:auto;max-height:70vh;
+    position:fixed;bottom:0;left:0;right:0;
+    border-left:none;border-top:2px solid var(--border);
+    z-index:300;overflow-y:auto;
+    transform:translateY(100%);transition:transform 0.25s ease;
+    box-shadow:0 -4px 20px rgba(0,0,0,0.15);
+    padding:14px 16px 20px;
+  }
+  .edit-panel.mobile-open{transform:translateY(0);}
+  .edit-panel h3{display:flex;justify-content:space-between;align-items:center;}
+  .card-preview-wrap{display:none;}
+  .mobile-close-btn{display:inline-block;background:var(--border);color:var(--text);border:none;border-radius:6px;padding:4px 12px;font-family:'Nunito',sans-serif;font-weight:800;font-size:0.72rem;cursor:pointer;}
+  .mobile-close-btn:hover{background:var(--red);color:#fff;}
+  .mobile-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:299;}
+  .mobile-overlay.active{display:block;}
+  .grid-header{flex-wrap:wrap;gap:8px;}
+}
+@media(min-width:769px){
+  .mobile-close-btn{display:none;}
+  .mobile-overlay{display:none!important;}
+}
+
 /* Print (in-page, not used much since we use exportPrint) */
 @media print {
   @page{size:A4;margin:0;}
@@ -178,8 +217,9 @@ body.seder-mode .catalog-only{display:none!important;}
     <div class="card-grid" id="cardGrid"></div>
   </div>
 
-  <div class="edit-panel">
-    <h3 id="editTitle">Select a card to edit</h3>
+  <div class="mobile-overlay" id="mobileOverlay" onclick="closeMobileEdit()"></div>
+  <div class="edit-panel" id="editPanel">
+    <h3><span id="editTitle">Select a card to edit</span> <button class="mobile-close-btn" onclick="closeMobileEdit()">Close</button></h3>
     <div id="editForm" style="display:none">
       <div class="type-toggle">
         <div class="type-btn active" id="typeBtnText" onclick="setCardType('text')">Text Card</div>
@@ -503,6 +543,18 @@ function selectCard(id){
   if(c.img){pi.src=c.img;pi.style.display='block';pp.style.display='none';}
   else{pi.style.display='none';pp.style.display='flex';}
   updatePreview();renderGrid();
+  openMobileEdit();
+}
+
+function openMobileEdit(){
+  if(window.innerWidth<=768){
+    document.getElementById('editPanel').classList.add('mobile-open');
+    document.getElementById('mobileOverlay').classList.add('active');
+  }
+}
+function closeMobileEdit(){
+  document.getElementById('editPanel').classList.remove('mobile-open');
+  document.getElementById('mobileOverlay').classList.remove('active');
 }
 
 function setCardType(t,silent=false){
@@ -587,7 +639,7 @@ function deleteCard(){
   document.getElementById('editForm').style.display='none';
   document.getElementById('editPh').style.display='block';
   document.getElementById('editTitle').textContent='Select a card to edit';
-  saveCards();renderGrid();
+  closeMobileEdit();saveCards();renderGrid();
 }
 
 function toggleCull(id){const c=cards.find(x=>x.id===id);if(c)c.culled=!c.culled;saveCards();renderGrid();}
