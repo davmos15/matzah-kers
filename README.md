@@ -2,7 +2,7 @@
 
 A collaborative Pesach-themed party card game inspired by Monikers. Browse 100 cards covering people, objects, phrases, and fun moments from the Seder — then start your own seder set and share it with a friend for real-time editing.
 
-**[Play Now](https://davmos15.github.io/monikers-pesach/)**
+**[Play Now](https://davmos15.github.io/matzah-kers/)**
 
 ## How It Works
 
