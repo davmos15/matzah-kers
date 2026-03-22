@@ -171,6 +171,10 @@ body.seder-mode .catalog-only{display:none!important;}
       <h2 id="gridLabel">All Cards</h2>
       <button class="btn btn-blue btn-sm seder-only" onclick="addNewCard()">+ Add Card</button>
     </div>
+    <div class="card-back-preview" id="cardBackPreview" style="margin-bottom:18px;text-align:center">
+      <div style="font-family:'Nunito',sans-serif;font-size:0.72rem;font-weight:800;color:var(--text-light);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Card Back</div>
+      <img id="cardBackImg" src="Matzah-kers-background.png" alt="Card back" style="width:120px;height:168px;object-fit:cover;border-radius:8px;box-shadow:0 3px 14px rgba(0,0,0,0.18);border:1px solid var(--border)">
+    </div>
     <div class="card-grid" id="cardGrid"></div>
   </div>
 
@@ -412,7 +416,8 @@ fetch('Matzah-kers-background.png')
 // ===== SEDER MANAGEMENT =====
 function generateSederId(){
   const chars='abcdefghijklmnopqrstuvwxyz0123456789';
-  let id='';for(let i=0;i<6;i++)id+=chars[Math.floor(Math.random()*chars.length)];
+  const arr=new Uint8Array(12);crypto.getRandomValues(arr);
+  let id='';for(let i=0;i<12;i++)id+=chars[arr[i]%chars.length];
   return id;
 }
 
@@ -452,10 +457,25 @@ function renderGrid(){
     const d=document.createElement('div');
     d.className='mini-card'+(selectedId===card.id?' selected':'')+(card.culled?' culled':'')+(card.type==='picture'?' picture-card':'');
     if(isSederMode) d.onclick=()=>selectCard(card.id);
-    const imgH=card.type==='picture'?(card.img?`<img class="mini-card-img" src="${card.img}" alt="">`:`<div class="mini-card-img-ph">No image yet</div>`):'';
-    let footerHTML=`<div class="pts-badge pts-${card.pts}">${card.pts}</div><span class="cat-badge ${CATCLASS[card.cat]}" style="font-size:0.58rem;padding:2px 5px">${card.cat}</span>`;
-    if(isSederMode) footerHTML+=`<button class="cull-btn" onclick="event.stopPropagation();toggleCull(${card.id})">${card.culled?'Restore':'Cull'}</button>`;
-    d.innerHTML=`<div class="mini-card-title">${card.title}</div>${imgH}<div class="mini-card-desc">${card.desc}</div><div class="mini-card-footer">${footerHTML}</div>`;
+
+    const titleEl=document.createElement('div');titleEl.className='mini-card-title';titleEl.textContent=card.title;
+    d.appendChild(titleEl);
+
+    if(card.type==='picture'){
+      if(card.img){const im=document.createElement('img');im.className='mini-card-img';im.src=card.img;im.alt='';d.appendChild(im);}
+      else{const ph=document.createElement('div');ph.className='mini-card-img-ph';ph.textContent='No image yet';d.appendChild(ph);}
+    }
+
+    const descEl=document.createElement('div');descEl.className='mini-card-desc';descEl.textContent=card.desc;
+    d.appendChild(descEl);
+
+    const footer=document.createElement('div');footer.className='mini-card-footer';
+    const ptsBadge=document.createElement('div');ptsBadge.className='pts-badge pts-'+card.pts;ptsBadge.textContent=card.pts;
+    footer.appendChild(ptsBadge);
+    const catBadge=document.createElement('span');catBadge.className='cat-badge '+(CATCLASS[card.cat]||'');catBadge.style.cssText='font-size:0.58rem;padding:2px 5px';catBadge.textContent=card.cat;
+    footer.appendChild(catBadge);
+    if(isSederMode){const cb=document.createElement('button');cb.className='cull-btn';cb.textContent=card.culled?'Restore':'Cull';cb.onclick=function(e){e.stopPropagation();toggleCull(card.id);};footer.appendChild(cb);}
+    d.appendChild(footer);
     grid.appendChild(d);
   });
   if(isSederMode){
@@ -510,11 +530,25 @@ function setPts(n){
   updatePreview();
 }
 
+function resizeImage(file,maxDim,quality,cb){
+  const img=new Image();
+  img.onload=function(){
+    let w=img.width,h=img.height;
+    if(w>maxDim||h>maxDim){const r=Math.min(maxDim/w,maxDim/h);w=Math.round(w*r);h=Math.round(h*r);}
+    const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
+    canvas.getContext('2d').drawImage(img,0,0,w,h);
+    cb(canvas.toDataURL('image/jpeg',quality));
+    URL.revokeObjectURL(img.src);
+  };
+  img.src=URL.createObjectURL(file);
+}
+
 function handleImageUpload(input){
   const c=cards.find(x=>x.id===selectedId);if(!c||!input.files[0])return;
-  const reader=new FileReader();
-  reader.onload=function(e){
-    c.img=e.target.result;
+  const file=input.files[0];
+  if(file.size>5*1024*1024){alert('Image must be under 5MB.');input.value='';return;}
+  resizeImage(file,800,0.8,function(dataUri){
+    c.img=dataUri;
     document.getElementById('pImg').src=c.img;
     document.getElementById('pImg').style.display='block';
     document.getElementById('pImgPh').style.display='none';
@@ -522,8 +556,7 @@ function handleImageUpload(input){
     document.getElementById('genStatus').textContent='Image uploaded!';
     setTimeout(()=>document.getElementById('genStatus').textContent='',2000);
     saveCards();renderGrid();
-  };
-  reader.readAsDataURL(input.files[0]);
+  });
 }
 
 function removeImage(){
@@ -562,7 +595,7 @@ function toggleCulled(){showCulled=!showCulled;renderGrid();}
 
 function addNewCard(){
   if(!isSederMode) return;
-  const nid=Math.max(...cards.map(c=>c.id))+1;
+  const nid=cards.length>0?Math.max(...cards.map(c=>c.id))+1:1;
   cards.push({id:nid,title:'New Card',cat:'People',pts:1,type:'text',img:null,imgPrompt:'',culled:false,desc:'Enter a description here.'});
   saveCards();renderGrid();selectCard(nid);
 }
@@ -573,6 +606,8 @@ function toggleFilter(el){
   else{activeFilters.add(cat);el.classList.add('active');}
   renderGrid();
 }
+
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 function exportPrint(){
   const active=cards.filter(c=>!c.culled);
@@ -590,16 +625,17 @@ function exportPrint(){
     const borderCol=isPic?'rgba(200,150,42,0.3)':'#c8b890';
     const catCol=isPic?'#e8b84b':CATC[c.cat]||'#2b7bb9';
     const dotsCol=isPic?'rgba(255,255,255,0.15)':'#d4c9b0';
-    const imgPart=isPic?(c.img
-      ?`<img style="width:100%;height:18mm;object-fit:cover;border-radius:1.5mm;display:block;margin-bottom:1.5mm" src="${c.img}" alt="">`
+    const safeImg=c.img&&c.img.startsWith('data:')?c.img:null;
+    const imgPart=isPic?(safeImg
+      ?`<img style="width:100%;height:18mm;object-fit:cover;border-radius:1.5mm;display:block;margin-bottom:1.5mm" src="${safeImg}" alt="">`
       :`<div style="width:100%;height:18mm;background:rgba(255,255,255,0.07);border-radius:1.5mm;margin-bottom:1.5mm;display:flex;align-items:center;justify-content:center;font-size:6.5pt;color:rgba(255,255,255,0.3)">No image</div>`):'';
     return `<div style="width:${CW};height:${CH};${bg};border-radius:3.5mm;padding:0;display:flex;flex-direction:column;border:0.35mm solid ${borderCol};box-sizing:border-box;overflow:hidden;page-break-inside:avoid;break-inside:avoid">
-  <div style="text-align:center;padding:2.5mm 3.5mm 0;font-family:'Nunito',sans-serif;font-size:5pt;font-weight:800;letter-spacing:2px;color:${catCol};text-transform:uppercase">${CATL[c.cat]||'PESACH'}</div>
-  <div style="text-align:center;padding:1.5mm 3.5mm 2mm;font-family:'Nunito',sans-serif;font-size:11pt;font-weight:900;color:${titleCol};line-height:1.15">${c.title}</div>
+  <div style="text-align:center;padding:2.5mm 3.5mm 0;font-family:'Nunito',sans-serif;font-size:5pt;font-weight:800;letter-spacing:2px;color:${catCol};text-transform:uppercase">${esc(CATL[c.cat]||'PESACH')}</div>
+  <div style="text-align:center;padding:1.5mm 3.5mm 2mm;font-family:'Nunito',sans-serif;font-size:11pt;font-weight:900;color:${titleCol};line-height:1.15">${esc(c.title)}</div>
   <div style="height:0.35mm;background:${borderCol};margin:0 3.5mm 2mm"></div>
   <div style="padding:0 3.5mm;flex:1;display:flex;flex-direction:column;overflow:hidden">
     ${imgPart}
-    <div style="font-family:'Nunito Sans',sans-serif;font-size:6.5pt;color:${descCol};line-height:1.5;flex:1;overflow:hidden">${c.desc}</div>
+    <div style="font-family:'Nunito Sans',sans-serif;font-size:7.5pt;color:${descCol};line-height:1.5;flex:1;overflow:hidden">${esc(c.desc)}</div>
   </div>
   <div style="text-align:center;color:${dotsCol};font-size:4pt;letter-spacing:2.5px;margin:1mm 0 0.5mm">&#8226; &#8226; &#8226; &#8226; &#8226; &#8226; &#8226; &#8226;</div>
   <div style="display:flex;align-items:center;justify-content:center;padding-bottom:2.5mm">
@@ -631,8 +667,27 @@ function exportPrint(){
   const backs=Array(Math.ceil(active.length/3)*3).fill(0);
   const backRows=toRows(backs,3);
 
-  const frontPages=frontRows.map(row=>`<div style="display:flex;gap:3mm;justify-content:center;margin-bottom:3mm">${row.map(cardHTML).join('')}</div>`).join('');
-  const backPages=backRows.map(row=>`<div style="display:flex;gap:3mm;justify-content:center;margin-bottom:3mm">${row.map(()=>backHTML()).join('')}</div>`).join('');
+  // Group rows into pages of 3 rows (9 cards per page)
+  function toPages(rows,rowsPerPage){
+    const pages=[];
+    for(let i=0;i<rows.length;i+=rowsPerPage)pages.push(rows.slice(i,i+rowsPerPage));
+    return pages;
+  }
+  const frontPageGroups=toPages(frontRows,3);
+  const backPageGroups=toPages(backRows,3);
+
+  function renderPageGroup(pageRows,renderFn){
+    return pageRows.map(row=>`<div style="display:flex;gap:3mm;justify-content:center;margin-bottom:3mm">${row.map(renderFn).join('')}</div>`).join('');
+  }
+
+  const frontSheets=frontPageGroups.map((pg,i)=>{
+    const pageBreak=i>0?'page-break-before:always;break-before:page;':'';
+    return `<div class="sheet" style="${pageBreak}">\n${i===0?`<div class="section-label">Card Fronts (${active.length} cards)</div>`:''}\n${renderPageGroup(pg,cardHTML)}\n</div>`;
+  }).join('\n');
+
+  const backSheets=backPageGroups.map((pg,i)=>{
+    return `<div class="sheet" style="page-break-before:always;break-before:page;">\n${i===0?'<div class="section-label">Card Backs (print on reverse side)</div>':''}\n${renderPageGroup(pg,()=>backHTML())}\n</div>`;
+  }).join('\n');
 
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Nunito+Sans:wght@400;600&display=swap" rel="stylesheet">
@@ -644,18 +699,11 @@ body{background:#fff;font-family:'Nunito Sans',sans-serif;}
 .no-print{position:fixed;top:10px;right:10px;padding:10px 20px;background:#1a1a2e;color:#e8b84b;border:none;border-radius:8px;font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;cursor:pointer;z-index:100;}
 .no-print:hover{background:#2b7bb9;color:#fff;}
 .section-label{font-family:'Nunito',sans-serif;font-size:9pt;font-weight:800;color:#888;text-transform:uppercase;letter-spacing:2px;margin:4mm 0 3mm;padding-bottom:1mm;border-bottom:0.3mm solid #ddd;text-align:center;}
-.page-break{page-break-before:always;break-before:page;}
 @media print{.no-print{display:none!important;}.section-label{display:none!important;}}
 </style></head><body>
 <button class="no-print" onclick="window.print()">&#x1F5A8; Print Now</button>
-<div class="sheet">
-  <div class="section-label">Card Fronts (${active.length} cards)</div>
-  ${frontPages}
-</div>
-<div class="sheet" style="page-break-before:always;break-before:page;">
-  <div class="section-label">Card Backs (print on reverse side)</div>
-  ${backPages}
-</div>
+${frontSheets}
+${backSheets}
 </body></html>`;
 
   const blob=new Blob([html],{type:'text/html'});
